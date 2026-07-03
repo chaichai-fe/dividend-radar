@@ -1,0 +1,39 @@
+{
+  "id": "/",
+  "name": "红利雷达 · A股红利ETF估值与组合",
+  "short_name": "红利雷达",
+  "description": "汇总 A 股红利 ETF 与高股息银行的净值、股息率，做低估/高估评级与加仓建议，并管理你的红利组合、测算年被动收入。",
+  "lang": "zh-CN",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#0f172a",
+  "background_color": "#0b0e12",
+  "categories": ["finance", "productivity"],
+  "icons": [
+    {
+      "src": "/favicon-32.png",
+      "sizes": "32x32",
+      "type": "image/png"
+    },
+    {
+      "src": "/logo192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/logo512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

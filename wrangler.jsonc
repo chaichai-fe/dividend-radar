@@ -1,0 +1,20 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "dividend-radar",
+  "compatibility_date": "2025-09-02",
+  "compatibility_flags": ["nodejs_compat"],
+  "main": "@tanstack/react-start/server-entry",
+  "observability": {
+    "enabled": true,
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "dividend-radar-db",
+      "database_id": "dca5fd9e-eba3-4fad-bf0a-4bb3098f9acf",
+      "migrations_dir": "drizzle/migrations",
+      // 本地开发也直连线上 D1（Worker 代码仍在本地执行，仅数据库调用代理到远程）
+      "remote": true,
+    },
+  ],
+}

@@ -1,0 +1,30 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0f172a"/>
+      <stop offset="1" stop-color="#1e293b"/>
+    </linearGradient>
+    <linearGradient id="sweep" x1="256" y1="256" x2="420" y2="150" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#10b981" stop-opacity="0.9"/>
+      <stop offset="1" stop-color="#10b981" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+
+  <!-- radar rings -->
+  <circle cx="256" cy="256" r="150" stroke="#334155" stroke-width="10" fill="none"/>
+  <circle cx="256" cy="256" r="100" stroke="#334155" stroke-width="10" fill="none"/>
+  <circle cx="256" cy="256" r="50" stroke="#334155" stroke-width="10" fill="none"/>
+
+  <!-- radar sweep -->
+  <path d="M256 256 L256 106 A150 150 0 0 1 400 210 Z" fill="url(#sweep)"/>
+
+  <!-- growth arrow -->
+  <path d="M176 316 L232 258 L288 300 L360 214"
+    stroke="#10b981" stroke-width="22" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <path d="M320 206 L368 200 L364 250 Z" fill="#10b981"/>
+
+  <!-- center dot -->
+  <circle cx="256" cy="256" r="16" fill="#10b981"/>
+</svg>
