@@ -7,7 +7,7 @@ import {
 } from '@tanstack/react-router'
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
 import { TanStackDevtools } from '@tanstack/react-devtools'
-import { Gauge, Landmark, LayoutDashboard, Wallet } from 'lucide-react'
+import { Factory, Gauge, Landmark, LayoutDashboard, Wallet } from 'lucide-react'
 
 import TanStackQueryDevtools from '../integrations/tanstack-query/devtools'
 
@@ -60,6 +60,7 @@ const navItems = [
   { to: '/', label: '概览', icon: LayoutDashboard, exact: true },
   { to: '/etfs', label: '红利ETF估值', icon: Gauge, exact: false },
   { to: '/banks', label: '高股息银行', icon: Landmark, exact: false },
+  { to: '/cyclicals', label: '煤炭电力', icon: Factory, exact: false },
   { to: '/portfolio', label: '我的组合', icon: Wallet, exact: false },
 ] as const
 

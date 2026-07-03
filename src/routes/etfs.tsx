@@ -295,7 +295,7 @@ function EtfsPage() {
                   </td>
                   <td
                     className="px-4 py-3 font-semibold tabular-nums text-foreground"
-                    title={`跟踪指数股息率（成份股加权，静态维护，截至 ${dataDate || '—'}），按实时净值折算；非基金实际分派率。`}
+                    title={`跟踪指数的成份股加权股息率${etf.yieldLive ? '（实时）' : `（静态维护，截至 ${dataDate || '—'}）`}；非基金实际分派率。`}
                   >
                     {etf.dividendYield.toFixed(2)}%
                   </td>
@@ -354,8 +354,9 @@ function EtfsPage() {
       <p className="text-xs text-muted-foreground">
         股息率为
         <span className="text-foreground">跟踪指数的成份股加权股息率</span>
-        （静态维护，截至 {dataDate || '—'}），按实时净值折算，反映底层资产收益水平，
-        并非基金实际分派率；PE / PB / 估值区间同为指数层面静态参考。仅净值与涨跌幅为实时数据。
+        ，反映底层资产收益水平，并非基金实际分派率：多数指数取实时值，少数未覆盖指数回退到静态维护值（截至
+        {' '}
+        {dataDate || '—'}）。PE / PB / 估值区间仍为指数层面静态参考。净值与涨跌幅为实时数据。
         本工具仅供学习研究，不构成投资建议。
       </p>
 

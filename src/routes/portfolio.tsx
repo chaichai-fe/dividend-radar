@@ -15,6 +15,7 @@ import { toast } from 'sonner'
 
 import { listEtfs } from '#/server/etfs'
 import { listBanks } from '#/server/banks'
+import { listCyclicals } from '#/server/cyclicals'
 import {
   addHolding,
   listHoldings,
@@ -52,6 +53,10 @@ export const Route = createFileRoute('/portfolio')({
       qc.ensureQueryData({ queryKey: ['etfs'], queryFn: () => listEtfs() }),
       qc.ensureQueryData({ queryKey: ['banks'], queryFn: () => listBanks() }),
       qc.ensureQueryData({
+        queryKey: ['cyclicals'],
+        queryFn: () => listCyclicals(),
+      }),
+      qc.ensureQueryData({
         queryKey: ['holdings'],
         queryFn: () => listHoldings(),
       }),
@@ -65,7 +70,7 @@ const DEFAULT_SHARES = 1000
 interface Instrument {
   code: string
   name: string
-  kind: 'etf' | 'bank'
+  kind: 'etf' | 'bank' | 'cyclical'
   /** 副标题：ETF 显示跟踪指数，银行显示分类 */
   subtitle: string
   /** 现价 / 净值 */
@@ -90,6 +95,10 @@ function PortfolioPage() {
     queryKey: ['banks'],
     queryFn: () => listBanks(),
   })
+  const cyclicalsQuery = useQuery({
+    queryKey: ['cyclicals'],
+    queryFn: () => listCyclicals(),
+  })
   const holdingsQuery = useQuery({
     queryKey: ['holdings'],
     queryFn: () => listHoldings(),
@@ -97,6 +106,7 @@ function PortfolioPage() {
 
   const etfs = etfQuery.data?.rows ?? []
   const banks = banksQuery.data?.rows ?? []
+  const cyclicals = cyclicalsQuery.data?.rows ?? []
   const holdings = holdingsQuery.data ?? []
 
   // 统一 ETF 与银行为同一套 Instrument，组合内不再区分。
@@ -129,8 +139,21 @@ function PortfolioPage() {
         valuation: null,
       }),
     )
+    cyclicals.forEach((c) =>
+      m.set(c.code, {
+        code: c.code,
+        name: c.name,
+        kind: 'cyclical',
+        subtitle: c.category,
+        price: c.price,
+        dividendYield: c.dividendYield,
+        freq: '年度',
+        searchText: `${c.name}${c.code}${c.category}`.toLowerCase(),
+        valuation: null,
+      }),
+    )
     return m
-  }, [etfs, banks])
+  }, [etfs, banks, cyclicals])
 
   const allInstruments = useMemo(
     () => [...instrumentMap.values()],
@@ -160,6 +183,7 @@ function PortfolioPage() {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['etfs'] }),
         queryClient.invalidateQueries({ queryKey: ['banks'] }),
+        queryClient.invalidateQueries({ queryKey: ['cyclicals'] }),
         queryClient.invalidateQueries({ queryKey: ['holdings'] }),
       ])
       toast.success('已刷新最新行情', { id })
@@ -196,7 +220,7 @@ function PortfolioPage() {
 
   function add(code: string) {
     if (holdings.some((h) => h.code === code)) {
-      toast.info('该 ETF 已在组合中')
+      toast.info('该标的已在组合中')
       return
     }
     addMutation.mutate(code)
@@ -958,17 +982,27 @@ function DividendLine({
   )
 }
 
-function KindTag({ kind }: { kind: 'etf' | 'bank' }) {
+function KindTag({ kind }: { kind: 'etf' | 'bank' | 'cyclical' }) {
+  const map = {
+    etf: { label: 'ETF', cls: 'bg-sky-500/15 text-sky-600 dark:text-sky-400' },
+    bank: {
+      label: '银行',
+      cls: 'bg-amber-500/15 text-amber-600 dark:text-amber-400',
+    },
+    cyclical: {
+      label: '周期股',
+      cls: 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-400',
+    },
+  } as const
+  const { label, cls } = map[kind]
   return (
     <span
       className={cn(
         'shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium',
-        kind === 'etf'
-          ? 'bg-sky-500/15 text-sky-600 dark:text-sky-400'
-          : 'bg-amber-500/15 text-amber-600 dark:text-amber-400',
+        cls,
       )}
     >
-      {kind === 'etf' ? 'ETF' : '银行'}
+      {label}
     </span>
   )
 }

@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as PortfolioRouteImport } from './routes/portfolio'
 import { Route as EtfsRouteImport } from './routes/etfs'
+import { Route as CyclicalsRouteImport } from './routes/cyclicals'
 import { Route as BanksRouteImport } from './routes/banks'
 import { Route as IndexRouteImport } from './routes/index'
 
@@ -22,6 +23,11 @@ const PortfolioRoute = PortfolioRouteImport.update({
 const EtfsRoute = EtfsRouteImport.update({
   id: '/etfs',
   path: '/etfs',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CyclicalsRoute = CyclicalsRouteImport.update({
+  id: '/cyclicals',
+  path: '/cyclicals',
   getParentRoute: () => rootRouteImport,
 } as any)
 const BanksRoute = BanksRouteImport.update({
@@ -38,12 +44,14 @@ const IndexRoute = IndexRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/banks': typeof BanksRoute
+  '/cyclicals': typeof CyclicalsRoute
   '/etfs': typeof EtfsRoute
   '/portfolio': typeof PortfolioRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/banks': typeof BanksRoute
+  '/cyclicals': typeof CyclicalsRoute
   '/etfs': typeof EtfsRoute
   '/portfolio': typeof PortfolioRoute
 }
@@ -51,20 +59,22 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/banks': typeof BanksRoute
+  '/cyclicals': typeof CyclicalsRoute
   '/etfs': typeof EtfsRoute
   '/portfolio': typeof PortfolioRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/banks' | '/etfs' | '/portfolio'
+  fullPaths: '/' | '/banks' | '/cyclicals' | '/etfs' | '/portfolio'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/banks' | '/etfs' | '/portfolio'
-  id: '__root__' | '/' | '/banks' | '/etfs' | '/portfolio'
+  to: '/' | '/banks' | '/cyclicals' | '/etfs' | '/portfolio'
+  id: '__root__' | '/' | '/banks' | '/cyclicals' | '/etfs' | '/portfolio'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   BanksRoute: typeof BanksRoute
+  CyclicalsRoute: typeof CyclicalsRoute
   EtfsRoute: typeof EtfsRoute
   PortfolioRoute: typeof PortfolioRoute
 }
@@ -83,6 +93,13 @@ declare module '@tanstack/react-router' {
       path: '/etfs'
       fullPath: '/etfs'
       preLoaderRoute: typeof EtfsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/cyclicals': {
+      id: '/cyclicals'
+      path: '/cyclicals'
+      fullPath: '/cyclicals'
+      preLoaderRoute: typeof CyclicalsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/banks': {
@@ -105,6 +122,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   BanksRoute: BanksRoute,
+  CyclicalsRoute: CyclicalsRoute,
   EtfsRoute: EtfsRoute,
   PortfolioRoute: PortfolioRoute,
 }

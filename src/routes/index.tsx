@@ -1,13 +1,15 @@
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import { useMemo } from 'react'
-import { ArrowRight, Gauge, Landmark, Wallet } from 'lucide-react'
+import { ArrowRight, Factory, Gauge, Landmark, Wallet } from 'lucide-react'
 
 import { listEtfs } from '#/server/etfs'
 import { listBanks } from '#/server/banks'
+import { listCyclicals } from '#/server/cyclicals'
 import { listHoldings } from '#/server/portfolio'
 import { BOND_YIELD_10Y, valuateMulti } from '#/lib/rating'
 import { rateBankYield } from '#/lib/bank-data'
+import { rateCyclicalYield } from '#/lib/cyclical-data'
 import { RatingBadge } from '#/components/rating-badge'
 import { Skeleton } from '#/components/ui/skeleton'
 import { cn } from '#/lib/utils.ts'
@@ -21,6 +23,10 @@ export const Route = createFileRoute('/')({
     await Promise.all([
       qc.ensureQueryData({ queryKey: ['etfs'], queryFn: () => listEtfs() }),
       qc.ensureQueryData({ queryKey: ['banks'], queryFn: () => listBanks() }),
+      qc.ensureQueryData({
+        queryKey: ['cyclicals'],
+        queryFn: () => listCyclicals(),
+      }),
       qc.ensureQueryData({
         queryKey: ['holdings'],
         queryFn: () => listHoldings(),
@@ -55,6 +61,12 @@ function DashboardPage() {
   })
   const bankRows = banksQuery.data?.rows ?? []
 
+  const cyclicalsQuery = useQuery({
+    queryKey: ['cyclicals'],
+    queryFn: () => listCyclicals(),
+  })
+  const cyclicalRows = cyclicalsQuery.data?.rows ?? []
+
   const picks = useMemo(() => {
     return rows
       .map((etf) => ({
@@ -76,6 +88,16 @@ function DashboardPage() {
     (b) => rateBankYield(b.dividendYield).isHigh,
   ).length
 
+  const topCyclicals = useMemo(() => {
+    return [...cyclicalRows]
+      .sort((a, b) => b.dividendYield - a.dividendYield)
+      .slice(0, 6)
+  }, [cyclicalRows])
+
+  const cyclicalHighCount = cyclicalRows.filter(
+    (c) => rateCyclicalYield(c.dividendYield).isHigh,
+  ).length
+
   const holdingsQuery = useQuery({
     queryKey: ['holdings'],
     queryFn: () => listHoldings(),
@@ -83,20 +105,30 @@ function DashboardPage() {
   const holdings = holdingsQuery.data ?? []
 
   const portfolio = useMemo(() => {
-    const etfMap = new Map(rows.map((e) => [e.code, e]))
+    // 统一 ETF / 银行 / 周期股为 code → { 现价, 股息率 }，组合内不区分类别。
+    const priceMap = new Map<string, { price: number; dividendYield: number }>()
+    rows.forEach((e) =>
+      priceMap.set(e.code, { price: e.nav, dividendYield: e.dividendYield }),
+    )
+    bankRows.forEach((b) =>
+      priceMap.set(b.code, { price: b.price, dividendYield: b.dividendYield }),
+    )
+    cyclicalRows.forEach((c) =>
+      priceMap.set(c.code, { price: c.price, dividendYield: c.dividendYield }),
+    )
     let totalValue = 0
     let totalIncome = 0
     for (const h of holdings) {
-      const etf = etfMap.get(h.code)
-      if (!etf) continue
-      // h.amount 表示持有份数，市值 = 份数 × 现价
-      const marketValue = h.amount * etf.nav
+      const inst = priceMap.get(h.code)
+      if (!inst) continue
+      // h.amount 表示持有份数/股数，市值 = 数量 × 现价
+      const marketValue = h.amount * inst.price
       totalValue += marketValue
-      totalIncome += marketValue * (etf.dividendYield / 100)
+      totalIncome += marketValue * (inst.dividendYield / 100)
     }
     const yieldPct = totalValue > 0 ? (totalIncome / totalValue) * 100 : 0
     return { totalValue, totalIncome, yieldPct, count: holdings.length }
-  }, [holdings, rows])
+  }, [holdings, rows, bankRows, cyclicalRows])
 
   const portfolioReady =
     holdingsQuery.isSuccess && query.isSuccess && portfolio.totalValue > 0
@@ -109,6 +141,11 @@ function DashboardPage() {
     bankRows.length > 0
       ? bankRows.reduce((s, b) => s + b.dividendYield, 0) / bankRows.length
       : 0
+  const cyclicalAvgYield =
+    cyclicalRows.length > 0
+      ? cyclicalRows.reduce((s, c) => s + c.dividendYield, 0) /
+        cyclicalRows.length
+      : 0
 
   return (
     <div className="rise-in space-y-8">
@@ -118,8 +155,8 @@ function DashboardPage() {
           A 股红利 ETF 投资雷达
         </h1>
         <p className="mt-3 max-w-2xl text-muted-foreground">
-          一站式汇总 A 股红利类 ETF 与高股息银行的净值、股息率，基于股息率历史分位做低估
-          / 高估评级与加仓建议，并帮你管理组合、测算年被动收入。
+          一站式汇总 A 股红利类 ETF、高股息银行与煤炭电力周期股的净值、股息率，
+          基于股息率历史分位做低估 / 高估评级与加仓建议，并帮你管理组合、测算年被动收入。
         </p>
       </div>
 
@@ -183,7 +220,7 @@ function DashboardPage() {
         </div>
       </Link>
 
-      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
         <Link
           to="/etfs"
           className="feature-card group rounded-2xl border border-border p-6 transition"
@@ -230,6 +267,30 @@ function DashboardPage() {
           </span>
         </Link>
 
+        <Link
+          to="/cyclicals"
+          className="feature-card group rounded-2xl border border-border p-6 transition"
+        >
+          <div className="flex items-start justify-between">
+            <Factory className="size-6 text-[var(--lagoon-deep)]" />
+            <span className="text-3xl font-bold tabular-nums text-emerald-500">
+              {cyclicalsQuery.isLoading ? '—' : cyclicalHighCount}
+            </span>
+          </div>
+          <h2 className="mt-4 text-lg font-semibold text-foreground">
+            煤炭电力周期股
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {cyclicalsQuery.isLoading
+              ? '按实时股价测算周期股股息率'
+              : `${cyclicalRows.length} 只标的，${cyclicalHighCount} 只股息率 ≥ 5%`}
+          </p>
+          <span className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-[var(--lagoon-deep)]">
+            查看周期股
+            <ArrowRight className="size-4 transition group-hover:translate-x-1" />
+          </span>
+        </Link>
+
         <div className="feature-card rounded-2xl border border-border p-6">
           <div className="flex items-start justify-between">
             <Gauge className="size-6 text-[var(--lagoon-deep)]" />
@@ -259,6 +320,22 @@ function DashboardPage() {
           <p className="mt-1 text-sm text-muted-foreground">
             对比十年国债 {BOND_YIELD_10Y}%，股债利差约 +
             {(bankAvgYield - BOND_YIELD_10Y).toFixed(2)}%
+          </p>
+        </div>
+
+        <div className="feature-card rounded-2xl border border-border p-6">
+          <div className="flex items-start justify-between">
+            <Factory className="size-6 text-[var(--lagoon-deep)]" />
+            <span className="text-3xl font-bold tabular-nums text-foreground">
+              {cyclicalsQuery.isLoading ? '—' : `${cyclicalAvgYield.toFixed(2)}%`}
+            </span>
+          </div>
+          <h2 className="mt-4 text-lg font-semibold text-foreground">
+            周期股平均股息率
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            对比十年国债 {BOND_YIELD_10Y}%，股债利差约 +
+            {(cyclicalAvgYield - BOND_YIELD_10Y).toFixed(2)}%
           </p>
         </div>
       </div>
@@ -409,10 +486,94 @@ function DashboardPage() {
         )}
       </div>
 
+      <div>
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="display-title text-xl font-bold text-foreground">
+            煤炭电力周期股 · 股息率榜
+          </h2>
+          <Link
+            to="/cyclicals"
+            className="text-sm font-medium text-[var(--lagoon-deep)]"
+          >
+            查看全部 →
+          </Link>
+        </div>
+
+        {cyclicalsQuery.isLoading ? (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <Skeleton key={i} className="h-24 rounded-2xl" />
+            ))}
+          </div>
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {topCyclicals.map((stock) => {
+              const rating = rateCyclicalYield(stock.dividendYield)
+              return (
+                <Link
+                  key={stock.code}
+                  to="/cyclicals"
+                  className="feature-card group rounded-2xl border border-border p-5"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-base font-semibold text-foreground">
+                        {stock.name}
+                        <span className="ml-2 text-xs font-normal text-muted-foreground">
+                          {stock.code}
+                        </span>
+                      </div>
+                      <div className="mt-0.5 text-xs text-muted-foreground">
+                        {stock.category} · PB {stock.pb.toFixed(2)}
+                      </div>
+                    </div>
+                    <span
+                      className={cn(
+                        'inline-flex w-fit items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap',
+                        bankToneClass[rating.tone],
+                      )}
+                    >
+                      {rating.label}
+                    </span>
+                  </div>
+                  <div className="mt-4 flex items-end justify-between">
+                    <div>
+                      <div className="text-xs text-muted-foreground">
+                        股息率
+                      </div>
+                      <div className="text-2xl font-bold tabular-nums text-foreground">
+                        {stock.dividendYield.toFixed(2)}%
+                      </div>
+                    </div>
+                    <div className="text-right text-xs text-muted-foreground">
+                      <div>现价 {stock.price.toFixed(2)}</div>
+                      <div
+                        title={
+                          stock.dpsYear
+                            ? `每股分红取 ${stock.dpsYear} 年度方案(含预案)，共 ${stock.dps.toFixed(3)} 元`
+                            : '每股分红为参考值'
+                        }
+                      >
+                        每股分红 {stock.dps.toFixed(2)}
+                        {stock.dpsYear ? (
+                          <span className="ml-1 text-[10px] text-muted-foreground/70">
+                            {String(stock.dpsYear).slice(2)}年
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+                </Link>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
       <p className="text-xs text-muted-foreground">
         评级方法：ETF
         以“股息率 + PB + PE 三因子在各自多年区间中的分位”加权衡量低估程度（权重
-        50/30/20）；银行按“每股分红 ÷
+        50/30/20）；银行与煤炭电力周期股按“每股分红 ÷
         实时股价”动态测算股息率。越便宜越低估、越值得关注。
         本工具仅供学习研究，不构成投资建议。
       </p>

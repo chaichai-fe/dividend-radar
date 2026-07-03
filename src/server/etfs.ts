@@ -51,18 +51,12 @@ export const listEtfs = createServerFn({ method: 'GET' }).handler(async () => {
     const quote = live.get(etf.code)
     const price = quote ? quote.price : etf.navSeed
     // 优先采用实时指数股息率(已按指数当前点位计算，含价格因素)；
-    // 若该指数无实时数据，则回退到「静态 yieldNow + 现价反推」的动态口径
-    // (与银行一致，越便宜股息率越高)。
+    // 若该指数无实时数据，则回退到指数层面的静态股息率 yieldNow。
+    // 注意：不再用「yieldNow × navSeed ÷ 现价」反推——navSeed 一旦过时会
+    // 严重放大股息率(如 navSeed=1.3 而现价 0.94 时把 6.4% 抬到 8.8%)。
     const liveIdxYield = indexYields.get(idx.code.toUpperCase())
     const yieldLive = liveIdxYield != null
-    let dividendYield: number
-    if (liveIdxYield != null) {
-      dividendYield = liveIdxYield.yieldNow
-    } else {
-      const impliedAnnualDist = (idx.yieldNow / 100) * etf.navSeed
-      dividendYield =
-        price > 0 ? (impliedAnnualDist / price) * 100 : idx.yieldNow
-    }
+    const dividendYield = liveIdxYield ? liveIdxYield.yieldNow : idx.yieldNow
     return {
       code: etf.code,
       name: etf.name,
