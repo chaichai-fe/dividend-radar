@@ -41,6 +41,7 @@ const filters: Array<{ key: CategoryFilter; label: string }> = [
   { key: 'high', label: '高股息(≥5%)' },
   { key: '煤炭', label: '煤炭' },
   { key: '电力', label: '电力' },
+  { key: '石油', label: '石油' },
 ]
 
 const toneClass: Record<
@@ -59,6 +60,7 @@ const toneClass: Record<
 const categoryTone: Record<CyclicalCategory, string> = {
   煤炭: 'bg-stone-500/15 text-stone-600 dark:text-stone-300',
   电力: 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-400',
+  石油: 'bg-orange-500/15 text-orange-600 dark:text-orange-400',
 }
 
 function CyclicalsPage() {
@@ -111,6 +113,7 @@ function CyclicalsPage() {
   const highCount = enriched.filter((e) => e.rating.isHigh).length
   const coalCount = enriched.filter((e) => e.stock.category === '煤炭').length
   const powerCount = enriched.filter((e) => e.stock.category === '电力').length
+  const oilCount = enriched.filter((e) => e.stock.category === '石油').length
   const avgYield =
     enriched.length > 0
       ? enriched.reduce((s, e) => s + e.stock.dividendYield, 0) /
@@ -121,14 +124,14 @@ function CyclicalsPage() {
     <div className="rise-in space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="island-kicker">Cyclical Dividend</p>
+          <p className="island-kicker">Energy Dividend</p>
           <h1 className="display-title mt-1 text-3xl font-bold text-foreground">
-            煤炭电力周期股
+            能源高股息
           </h1>
           <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
             汇总 A 股 {rows.length}
-            家煤炭与电力周期红利股，按“每股分红 ÷ 实时股价”动态测算股息率，
-            并对照十年国债做股债利差，筛选真正的高股息周期标的。
+            只煤炭、电力与石油油气高股息标的，按“每股分红 ÷ 实时股价”动态测算股息率，
+            并对照十年国债做股债利差，筛选真正的高股息能源标的。
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -169,7 +172,11 @@ function CyclicalsPage() {
       <div className="grid gap-4 sm:grid-cols-4">
         <StatCard label="收录标的" value={`${rows.length}`} unit="只" />
         <StatCard label="高股息(≥5%)" value={`${highCount}`} unit="只" accent />
-        <StatCard label="煤炭 / 电力" value={`${coalCount}/${powerCount}`} unit="只" />
+        <StatCard
+          label="煤炭/电力/石油"
+          value={`${coalCount}/${powerCount}/${oilCount}`}
+          unit="只"
+        />
         <StatCard label="平均股息率" value={avgYield.toFixed(2)} unit="%" />
       </div>
 
@@ -352,8 +359,8 @@ function CyclicalsPage() {
       <p className="text-xs text-muted-foreground">
         股息率按“每股分红 ÷ 实时股价”动态计算，股价越低股息率越高。每股分红采用
         <span className="text-foreground">前瞻口径</span>
-        ：取最新已公告年度分红合计（含预案/董事会或股东大会通过）。煤炭电力属周期行业，
-        分红随业绩与煤价/电价波动，历史高股息不代表未来可持续。分红数据来自东方财富，PB
+        ：取最新已公告年度分红合计（含预案/董事会或股东大会通过）。能源(煤炭/电力/石油)多属周期行业，
+        分红随业绩与煤价/电价/油价波动，历史高股息不代表未来可持续。分红数据来自东方财富，PB
         为参考值。本工具仅供学习研究，不构成投资建议。
       </p>
 

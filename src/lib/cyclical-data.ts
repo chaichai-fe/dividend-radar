@@ -1,5 +1,5 @@
 /**
- * A 股煤炭 / 电力周期红利股数据集。
+ * A 股能源高股息标的数据集（煤炭 / 电力 / 石油油气）。
  *
  * 数据来源：各公司年度报告、东方财富、同花顺等公开渠道。
  * 每股分红(dps)与现价(priceSeed)均为「兜底种子值」：
@@ -18,7 +18,7 @@ import type { MarketCode } from '#/lib/bank-data'
 
 export const CYCLICAL_DATA_DATE = '2026-06-17'
 
-export type CyclicalCategory = '煤炭' | '电力'
+export type CyclicalCategory = '煤炭' | '电力' | '石油'
 
 export interface CyclicalSeed {
   /** 场内代码 */
@@ -67,4 +67,12 @@ export const CYCLICALS: Array<CyclicalSeed> = [
   { code: '600863', name: '内蒙华电', market: 'SH', category: '电力', dps: 0.3, pb: 1.3, priceSeed: 5.0 },
   { code: '000539', name: '粤电力A', market: 'SZ', category: '电力', dps: 0.1, pb: 1.2, priceSeed: 5.0 },
   { code: '600483', name: '福能股份', market: 'SH', category: '电力', dps: 0.4, pb: 1.2, priceSeed: 11.0 },
+
+  // 石油油气
+  { code: '600028', name: '中国石化', market: 'SH', category: '石油', dps: 0.2, pb: 0.9, priceSeed: 6.5 },
+  { code: '601857', name: '中国石油', market: 'SH', category: '石油', dps: 0.47, pb: 1.1, priceSeed: 8.8 },
+  { code: '600938', name: '中国海油', market: 'SH', category: '石油', dps: 1.145, pb: 1.9, priceSeed: 28.0 },
+  { code: '600968', name: '海油发展', market: 'SH', category: '石油', dps: 0.147, pb: 1.3, priceSeed: 4.5 },
+  { code: '601808', name: '中海油服', market: 'SH', category: '石油', dps: 0.2825, pb: 1.7, priceSeed: 16.0 },
+  { code: '600256', name: '广汇能源', market: 'SH', category: '石油', dps: 0.2, pb: 1.1, priceSeed: 5.5 },
 ]

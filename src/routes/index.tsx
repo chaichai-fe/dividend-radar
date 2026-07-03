@@ -155,7 +155,7 @@ function DashboardPage() {
           A 股红利 ETF 投资雷达
         </h1>
         <p className="mt-3 max-w-2xl text-muted-foreground">
-          一站式汇总 A 股红利类 ETF、高股息银行与煤炭电力周期股的净值、股息率，
+          一站式汇总 A 股红利类 ETF、高股息银行与能源高股息（煤炭/电力/石油）的净值、股息率，
           基于股息率历史分位做低估 / 高估评级与加仓建议，并帮你管理组合、测算年被动收入。
         </p>
       </div>
@@ -278,15 +278,15 @@ function DashboardPage() {
             </span>
           </div>
           <h2 className="mt-4 text-lg font-semibold text-foreground">
-            煤炭电力周期股
+            能源高股息
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
             {cyclicalsQuery.isLoading
-              ? '按实时股价测算周期股股息率'
+              ? '煤炭/电力/石油，按实时股价测算股息率'
               : `${cyclicalRows.length} 只标的，${cyclicalHighCount} 只股息率 ≥ 5%`}
           </p>
           <span className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-[var(--lagoon-deep)]">
-            查看周期股
+            查看能源股
             <ArrowRight className="size-4 transition group-hover:translate-x-1" />
           </span>
         </Link>
@@ -331,7 +331,7 @@ function DashboardPage() {
             </span>
           </div>
           <h2 className="mt-4 text-lg font-semibold text-foreground">
-            周期股平均股息率
+            能源股平均股息率
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
             对比十年国债 {BOND_YIELD_10Y}%，股债利差约 +
@@ -489,7 +489,7 @@ function DashboardPage() {
       <div>
         <div className="mb-3 flex items-center justify-between">
           <h2 className="display-title text-xl font-bold text-foreground">
-            煤炭电力周期股 · 股息率榜
+            能源高股息 · 股息率榜
           </h2>
           <Link
             to="/cyclicals"
@@ -573,7 +573,7 @@ function DashboardPage() {
       <p className="text-xs text-muted-foreground">
         评级方法：ETF
         以“股息率 + PB + PE 三因子在各自多年区间中的分位”加权衡量低估程度（权重
-        50/30/20）；银行与煤炭电力周期股按“每股分红 ÷
+        50/30/20）；银行与能源高股息（煤炭/电力/石油）按“每股分红 ÷
         实时股价”动态测算股息率。越便宜越低估、越值得关注。
         本工具仅供学习研究，不构成投资建议。
       </p>
