@@ -1,1 +1,0 @@
-function r(e){return e>=6?{tier:"ultra",label:"极高股息",tone:"buy-strong",isHigh:!0}:e>=5?{tier:"high",label:"高股息",tone:"buy",isHigh:!0}:e>=4?{tier:"medium-high",label:"中高股息",tone:"hold",isHigh:!1}:e>=3?{tier:"normal",label:"一般",tone:"watch",isHigh:!1}:{tier:"low",label:"偏低",tone:"avoid",isHigh:!1}}export{r};
