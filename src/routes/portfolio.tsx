@@ -155,15 +155,16 @@ function PortfolioPage() {
   async function refresh() {
     if (refreshing) return
     setRefreshing(true)
+    const id = toast.loading('正在刷新最新行情…')
     try {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['etfs'] }),
         queryClient.invalidateQueries({ queryKey: ['banks'] }),
         queryClient.invalidateQueries({ queryKey: ['holdings'] }),
       ])
-      toast.success('已刷新最新行情')
+      toast.success('已刷新最新行情', { id })
     } catch {
-      toast.error('刷新失败，请重试')
+      toast.error('刷新失败，请重试', { id })
     } finally {
       setRefreshing(false)
     }

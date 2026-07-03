@@ -155,9 +155,14 @@ function EtfsPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => {
-              query.refetch()
-              toast.info('正在刷新实时净值…')
+            onClick={async () => {
+              const id = toast.loading('正在刷新实时净值…')
+              const res = await query.refetch()
+              if (res.isError) {
+                toast.error('刷新失败，请重试', { id })
+              } else {
+                toast.success('已刷新最新行情', { id })
+              }
             }}
             disabled={query.isFetching}
           >
