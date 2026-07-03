@@ -1,17 +1,27 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
-import { ArrowUpDown, RefreshCw, Search } from 'lucide-react'
+import { ArrowUpDown, PlusCircle, RefreshCw, Search } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { listBanks } from '#/server/banks'
+import type { BankQuote } from '#/server/banks'
 import { rateBankYield } from '#/lib/bank-data'
 import type { BankCategory } from '#/lib/bank-data'
 import { equityBondSpread } from '#/lib/rating'
+import { addHolding } from '#/server/portfolio'
 import { Input } from '#/components/ui/input'
 import { Button } from '#/components/ui/button'
 import { Skeleton } from '#/components/ui/skeleton'
 import { cn } from '#/lib/utils.ts'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '#/components/ui/dialog'
 
 export const Route = createFileRoute('/banks')({
   component: BanksPage,
@@ -57,6 +67,7 @@ function BanksPage() {
   const [keyword, setKeyword] = useState('')
   const [filter, setFilter] = useState<CategoryFilter>('all')
   const [sort, setSort] = useState<SortKey>('yield')
+  const [target, setTarget] = useState<BankQuote | null>(null)
 
   const rows = query.data?.rows ?? []
 
@@ -221,13 +232,14 @@ function BanksPage() {
                   onClick={() => setSort('pb')}
                 />
                 <th className="px-4 py-3 font-medium">评级</th>
+                <th className="px-4 py-3 text-right font-medium">操作</th>
               </tr>
             </thead>
             <tbody>
               {query.isLoading &&
                 Array.from({ length: 10 }).map((_, i) => (
                   <tr key={i} className="border-b border-border/60">
-                    <td className="px-4 py-3" colSpan={7}>
+                    <td className="px-4 py-3" colSpan={8}>
                       <Skeleton className="h-6 w-full" />
                     </td>
                   </tr>
@@ -304,6 +316,16 @@ function BanksPage() {
                       {rating.label}
                     </span>
                   </td>
+                  <td className="px-4 py-3 text-right">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setTarget(bank)}
+                    >
+                      <PlusCircle className="size-4" />
+                      加入
+                    </Button>
+                  </td>
                 </tr>
               ))}
 
@@ -311,7 +333,7 @@ function BanksPage() {
                 <tr>
                   <td
                     className="px-4 py-10 text-center text-muted-foreground"
-                    colSpan={7}
+                    colSpan={8}
                   >
                     没有匹配的银行
                   </td>
@@ -329,7 +351,129 @@ function BanksPage() {
         故可能高于部分平台采用的“近 12 个月已实施”口径。分红数据来自东方财富，PB
         为参考值。本工具仅供学习研究，不构成投资建议。
       </p>
+
+      <AddDialog bank={target} onClose={() => setTarget(null)} />
     </div>
+  )
+}
+
+function AddDialog({
+  bank,
+  onClose,
+}: {
+  bank: BankQuote | null
+  onClose: () => void
+}) {
+  const [shares, setShares] = useState('100')
+  const [saving, setSaving] = useState(false)
+  const queryClient = useQueryClient()
+
+  const rating = bank ? rateBankYield(bank.dividendYield) : null
+
+  async function confirm() {
+    if (!bank) return
+    const value = Number(shares)
+    if (!Number.isFinite(value) || value <= 0) {
+      toast.error('请输入有效的股数')
+      return
+    }
+    setSaving(true)
+    try {
+      await addHolding({ data: { code: bank.code, amount: value } })
+      await queryClient.invalidateQueries({ queryKey: ['holdings'] })
+      toast.success(`已将 ${bank.name} 加入组合（${value.toLocaleString()} 股）`)
+      onClose()
+    } catch {
+      toast.error('加入组合失败，请重试')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const numShares = Number(shares) || 0
+
+  return (
+    <Dialog open={Boolean(bank)} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent>
+        {bank && rating && (
+          <>
+            <DialogHeader>
+              <DialogTitle>
+                加入组合 · {bank.name}（{bank.code}）
+              </DialogTitle>
+              <DialogDescription>
+                {bank.category}｜股息率 {bank.dividendYield.toFixed(2)}%｜
+                <span
+                  className={cn(
+                    'ml-1 inline-flex w-fit items-center rounded-full border px-2 py-0.5 text-xs font-semibold whitespace-nowrap',
+                    toneClass[rating.tone],
+                  )}
+                >
+                  {rating.label}
+                </span>
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-3">
+              <div className="grid grid-cols-3 gap-2 rounded-lg bg-muted/60 p-3 text-center text-xs">
+                <div>
+                  <div className="text-muted-foreground">现价</div>
+                  <div className="mt-1 font-semibold tabular-nums text-foreground">
+                    {bank.price.toFixed(2)}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-muted-foreground">每股分红</div>
+                  <div className="mt-1 font-semibold tabular-nums text-foreground">
+                    {bank.dps.toFixed(4)}
+                    {bank.dpsYear ? (
+                      <span className="ml-1 text-[10px] text-muted-foreground/70">
+                        {bank.dpsYear}
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-muted-foreground">PB</div>
+                  <div className="mt-1 font-semibold tabular-nums text-foreground">
+                    {bank.pb.toFixed(2)}
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">买入股数（股）</label>
+                <Input
+                  type="number"
+                  value={shares}
+                  onChange={(e) => setShares(e.target.value)}
+                  min={0}
+                  step={100}
+                />
+                <p className="text-xs text-muted-foreground">
+                  市值 ≈ ¥
+                  {(numShares * bank.price).toLocaleString(undefined, {
+                    maximumFractionDigits: 0,
+                  })}
+                  ｜预计年分红 ≈ ¥
+                  {(numShares * bank.dps).toLocaleString(undefined, {
+                    maximumFractionDigits: 0,
+                  })}
+                </p>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={onClose} disabled={saving}>
+                取消
+              </Button>
+              <Button onClick={confirm} disabled={saving}>
+                {saving ? '加入中…' : '确认加入'}
+              </Button>
+            </DialogFooter>
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
   )
 }
 

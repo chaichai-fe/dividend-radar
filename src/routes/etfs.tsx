@@ -133,8 +133,11 @@ function EtfsPage() {
                 <div>
                   实时净值 {query.data.liveCount}/{rows.length}
                 </div>
+                <div>
+                  实时股息率 {query.data.yieldLiveCount}/{rows.length}
+                </div>
                 <div
-                  title="股息率、PE、PB、估值区间为指数层面静态维护数据，仅净值实时。"
+                  title="股息率优先取跟踪指数的实时股息率，未覆盖的指数与 PE、PB、估值区间仍为静态维护数据。"
                   className={cn(
                     isStale && 'font-medium text-amber-600 dark:text-amber-400',
                   )}
