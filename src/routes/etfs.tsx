@@ -6,7 +6,12 @@ import { toast } from 'sonner'
 
 import { listEtfs } from '#/server/etfs'
 import type { EtfQuote } from '#/server/etfs'
-import { equityBondSpread, valuateMulti } from '#/lib/rating'
+import { getBondYield10Y } from '#/server/bond-yield'
+import {
+  BOND_YIELD_10Y_FALLBACK,
+  equityBondSpread,
+  valuateMulti,
+} from '#/lib/rating'
 import { addHolding } from '#/server/portfolio'
 import { RatingBadge, ValuationBar } from '#/components/rating-badge'
 import { Input } from '#/components/ui/input'
@@ -25,10 +30,17 @@ import {
 export const Route = createFileRoute('/etfs')({
   component: EtfsPage,
   loader: async ({ context }) => {
-    await context.queryClient.ensureQueryData({
-      queryKey: ['etfs'],
-      queryFn: () => listEtfs(),
-    })
+    const qc = context.queryClient
+    await Promise.all([
+      qc.ensureQueryData({
+        queryKey: ['etfs'],
+        queryFn: () => listEtfs(),
+      }),
+      qc.ensureQueryData({
+        queryKey: ['bond-yield'],
+        queryFn: () => getBondYield10Y(),
+      }),
+    ])
   },
 })
 
@@ -48,6 +60,11 @@ function EtfsPage() {
     queryKey: ['etfs'],
     queryFn: () => listEtfs(),
   })
+  const bondQuery = useQuery({
+    queryKey: ['bond-yield'],
+    queryFn: () => getBondYield10Y(),
+  })
+  const bondYield = bondQuery.data?.yield ?? BOND_YIELD_10Y_FALLBACK
 
   const [keyword, setKeyword] = useState('')
   const [filter, setFilter] = useState<FilterKey>('all')
@@ -60,9 +77,9 @@ function EtfsPage() {
     return rows.map((etf) => ({
       etf,
       valuation: valuateMulti(etf),
-      spread: equityBondSpread(etf.dividendYield),
+      spread: equityBondSpread(etf.dividendYield, bondYield),
     }))
-  }, [rows])
+  }, [rows, bondYield])
 
   const visible = useMemo(() => {
     const kw = keyword.trim().toLowerCase()
@@ -122,8 +139,8 @@ function EtfsPage() {
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
             汇总 A 股 {rows.length} 只主流红利 ETF
-            的净值与股息率，按“股息率 + PB + PE 多因子历史分位”评级低估 /
-            高估与加仓价值。
+            的净值与股息率，按“股息率 + PB + PE
+            在各自多年区间中的位置”加权评级低估 / 高估与加仓价值（非严格历史百分位）。
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -244,7 +261,7 @@ function EtfsPage() {
                   onClick={() => setSort('scale')}
                 />
                 <SortableTh
-                  label="低估程度"
+                  label="便宜度"
                   active={sort === 'valuation'}
                   onClick={() => setSort('valuation')}
                 />
@@ -354,10 +371,13 @@ function EtfsPage() {
       <p className="text-xs text-muted-foreground">
         股息率为
         <span className="text-foreground">跟踪指数的成份股加权股息率</span>
-        ，反映底层资产收益水平，并非基金实际分派率：多数指数取实时值，少数未覆盖指数回退到静态维护值（截至
-        {' '}
-        {dataDate || '—'}）。PE / PB / 估值区间仍为指数层面静态参考。净值与涨跌幅为实时数据。
-        本工具仅供学习研究，不构成投资建议。
+        ，并非基金实际分派率：多数指数取实时值，少数未覆盖指数回退到静态值（截至{' '}
+        {dataDate || '—'}）。便宜度按指标在多年区间中的位置加权（默认权重 股息率
+        50% · PB 30% · PE 20%；股息率已实时而 PE/PB 仍静态时自动调整为 70/20/10）。股债利差对比十年国债
+        {bondQuery.data?.live
+          ? ` ${bondYield.toFixed(2)}%（${bondQuery.data.date || '实时'}）`
+          : ` ${bondYield.toFixed(2)}%（参考值）`}
+        。本工具仅供学习研究，不构成投资建议。
       </p>
 
       <AddDialog etf={target} onClose={() => setTarget(null)} />
@@ -493,7 +513,7 @@ function AddDialog({
               </p>
               <div className="rounded-lg bg-muted/60 p-3">
                 <div className="mb-2 flex items-center justify-between text-xs">
-                  <span className="text-foreground">多因子便宜度分位</span>
+                  <span className="text-foreground">多因子便宜度（区间位置）</span>
                   <span className="text-muted-foreground">
                     综合 {valuation.percentile}% · 越高越低估
                   </span>
@@ -504,8 +524,10 @@ function AddDialog({
                   <FactorRow label="PE" value={valuation.factors.pe} />
                 </div>
                 <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
-                  权重 股息率 50% · PB 30% · PE 20%。红利指数偏金融/周期，PB
-                  比 PE 更具参考性。
+                  {valuation.weightsAdjusted
+                    ? '权重 股息率 70% · PB 20% · PE 10%（股息率实时、PE/PB 静态，已降权估值因子）。'
+                    : '权重 股息率 50% · PB 30% · PE 20%。'}
+                  红利指数偏金融/周期，PB 比 PE 更具参考性。
                 </p>
               </div>
               <div className="space-y-1.5">

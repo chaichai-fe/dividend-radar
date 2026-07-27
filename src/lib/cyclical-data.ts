@@ -1,5 +1,5 @@
 /**
- * A 股能源高股息标的数据集（煤炭 / 电力 / 石油油气）。
+ * A 股高股息央企/国企标的数据集（煤炭 / 电力 / 石油油气 / 电信运营商）。
  *
  * 数据来源：各公司年度报告、东方财富、同花顺等公开渠道。
  * 每股分红(dps)与现价(priceSeed)均为「兜底种子值」：
@@ -11,14 +11,14 @@
  * ⚠️ 本数据仅供学习与研究，数值为参考值，可能与最新公告存在偏差，不构成任何投资建议。
  */
 
-export { rateBankYield as rateCyclicalYield } from '#/lib/bank-data'
 export type { DividendRating, DividendTier, MarketCode } from '#/lib/bank-data'
 
-import type { MarketCode } from '#/lib/bank-data'
+import { rateBankYield } from '#/lib/bank-data'
+import type { DividendRating, MarketCode } from '#/lib/bank-data'
 
 export const CYCLICAL_DATA_DATE = '2026-06-17'
 
-export type CyclicalCategory = '煤炭' | '电力' | '石油'
+export type CyclicalCategory = '煤炭' | '电力' | '石油' | '通信'
 
 export interface CyclicalSeed {
   /** 场内代码 */
@@ -75,4 +75,45 @@ export const CYCLICALS: Array<CyclicalSeed> = [
   { code: '600968', name: '海油发展', market: 'SH', category: '石油', dps: 0.147, pb: 1.3, priceSeed: 4.5 },
   { code: '601808', name: '中海油服', market: 'SH', category: '石油', dps: 0.2825, pb: 1.7, priceSeed: 16.0 },
   { code: '600256', name: '广汇能源', market: 'SH', category: '石油', dps: 0.2, pb: 1.1, priceSeed: 5.5 },
+
+  // 通信（电信运营商）
+  { code: '600941', name: '中国移动', market: 'SH', category: '通信', dps: 4.63, pb: 1.7, priceSeed: 112.0 },
+  { code: '601728', name: '中国电信', market: 'SH', category: '通信', dps: 0.24, pb: 1.3, priceSeed: 7.8 },
+  { code: '600050', name: '中国联通', market: 'SH', category: '通信', dps: 0.19, pb: 0.9, priceSeed: 5.6 },
 ]
+
+/**
+ * 央企/周期股高股息分级。
+ * 通信运营商股息中枢低于资源类，使用更低的绝对阈值，避免永远进不了「高股息」。
+ */
+export function rateCyclicalYield(
+  dividendYield: number,
+  category?: CyclicalCategory,
+): DividendRating {
+  if (category === '通信') {
+    if (dividendYield >= 4.5) {
+      return {
+        tier: 'ultra',
+        label: '极高股息',
+        tone: 'buy-strong',
+        isHigh: true,
+      }
+    }
+    if (dividendYield >= 3.5) {
+      return { tier: 'high', label: '高股息', tone: 'buy', isHigh: true }
+    }
+    if (dividendYield >= 3) {
+      return {
+        tier: 'medium-high',
+        label: '中高股息',
+        tone: 'hold',
+        isHigh: false,
+      }
+    }
+    if (dividendYield >= 2.5) {
+      return { tier: 'normal', label: '一般', tone: 'watch', isHigh: false }
+    }
+    return { tier: 'low', label: '偏低', tone: 'avoid', isHigh: false }
+  }
+  return rateBankYield(dividendYield)
+}

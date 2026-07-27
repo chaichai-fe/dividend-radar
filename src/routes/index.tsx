@@ -7,7 +7,12 @@ import { listEtfs } from '#/server/etfs'
 import { listBanks } from '#/server/banks'
 import { listCyclicals } from '#/server/cyclicals'
 import { listHoldings } from '#/server/portfolio'
-import { BOND_YIELD_10Y, valuateMulti } from '#/lib/rating'
+import { getBondYield10Y } from '#/server/bond-yield'
+import {
+  BOND_YIELD_10Y_FALLBACK,
+  effectiveIncomeYield,
+  valuateMulti,
+} from '#/lib/rating'
 import { rateBankYield } from '#/lib/bank-data'
 import { rateCyclicalYield } from '#/lib/cyclical-data'
 import { RatingBadge } from '#/components/rating-badge'
@@ -30,6 +35,10 @@ export const Route = createFileRoute('/')({
       qc.ensureQueryData({
         queryKey: ['holdings'],
         queryFn: () => listHoldings(),
+      }),
+      qc.ensureQueryData({
+        queryKey: ['bond-yield'],
+        queryFn: () => getBondYield10Y(),
       }),
     ])
   },
@@ -67,6 +76,12 @@ function DashboardPage() {
   })
   const cyclicalRows = cyclicalsQuery.data?.rows ?? []
 
+  const bondQuery = useQuery({
+    queryKey: ['bond-yield'],
+    queryFn: () => getBondYield10Y(),
+  })
+  const bondYield = bondQuery.data?.yield ?? BOND_YIELD_10Y_FALLBACK
+
   const picks = useMemo(() => {
     return rows
       .map((etf) => ({
@@ -95,7 +110,7 @@ function DashboardPage() {
   }, [cyclicalRows])
 
   const cyclicalHighCount = cyclicalRows.filter(
-    (c) => rateCyclicalYield(c.dividendYield).isHigh,
+    (c) => rateCyclicalYield(c.dividendYield, c.category).isHigh,
   ).length
 
   const holdingsQuery = useQuery({
@@ -105,26 +120,38 @@ function DashboardPage() {
   const holdings = holdingsQuery.data ?? []
 
   const portfolio = useMemo(() => {
-    // 统一 ETF / 银行 / 周期股为 code → { 现价, 股息率 }，组合内不区分类别。
-    const priceMap = new Map<string, { price: number; dividendYield: number }>()
+    // 统一 ETF / 银行 / 央企为 code → { 现价, 有效股息率 }。
+    // ETF 用指数股息率 × 折扣估算到手收入，避免按指数口径虚高。
+    const priceMap = new Map<
+      string,
+      { price: number; incomeYield: number }
+    >()
     rows.forEach((e) =>
-      priceMap.set(e.code, { price: e.nav, dividendYield: e.dividendYield }),
+      priceMap.set(e.code, {
+        price: e.nav,
+        incomeYield: effectiveIncomeYield(e.dividendYield, 'etf'),
+      }),
     )
     bankRows.forEach((b) =>
-      priceMap.set(b.code, { price: b.price, dividendYield: b.dividendYield }),
+      priceMap.set(b.code, {
+        price: b.price,
+        incomeYield: effectiveIncomeYield(b.dividendYield, 'bank'),
+      }),
     )
     cyclicalRows.forEach((c) =>
-      priceMap.set(c.code, { price: c.price, dividendYield: c.dividendYield }),
+      priceMap.set(c.code, {
+        price: c.price,
+        incomeYield: effectiveIncomeYield(c.dividendYield, 'cyclical'),
+      }),
     )
     let totalValue = 0
     let totalIncome = 0
     for (const h of holdings) {
       const inst = priceMap.get(h.code)
       if (!inst) continue
-      // h.amount 表示持有份数/股数，市值 = 数量 × 现价
       const marketValue = h.amount * inst.price
       totalValue += marketValue
-      totalIncome += marketValue * (inst.dividendYield / 100)
+      totalIncome += marketValue * (inst.incomeYield / 100)
     }
     const yieldPct = totalValue > 0 ? (totalIncome / totalValue) * 100 : 0
     return { totalValue, totalIncome, yieldPct, count: holdings.length }
@@ -155,8 +182,8 @@ function DashboardPage() {
           A 股红利 ETF 投资雷达
         </h1>
         <p className="mt-3 max-w-2xl text-muted-foreground">
-          一站式汇总 A 股红利类 ETF、高股息银行与能源高股息（煤炭/电力/石油）的净值、股息率，
-          基于股息率历史分位做低估 / 高估评级与加仓建议，并帮你管理组合、测算年被动收入。
+          一站式汇总 A 股红利类 ETF、高股息银行与央企高股息（煤炭/电力/石油/通信）的净值、股息率，
+          基于股息率等在多年区间中的位置做低估 / 高估评级与加仓建议，并帮你管理组合、测算年被动收入。
         </p>
       </div>
 
@@ -200,9 +227,9 @@ function DashboardPage() {
             </span>
           </div>
           <div className="shrink-0 sm:text-right">
-            <div className="text-xs font-medium text-muted-foreground">
-              预计年被动收入
-            </div>
+              <div className="text-xs font-medium text-muted-foreground">
+                估算年被动收入
+              </div>
             <div className="mt-1 text-4xl font-bold tabular-nums text-emerald-600 dark:text-emerald-400 sm:text-5xl">
               {portfolioReady
                 ? `¥${Math.round(portfolio.totalIncome).toLocaleString()}`
@@ -278,15 +305,15 @@ function DashboardPage() {
             </span>
           </div>
           <h2 className="mt-4 text-lg font-semibold text-foreground">
-            能源高股息
+            央企高股息
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
             {cyclicalsQuery.isLoading
-              ? '煤炭/电力/石油，按实时股价测算股息率'
+              ? '煤炭/电力/石油/通信，按实时股价测算股息率'
               : `${cyclicalRows.length} 只标的，${cyclicalHighCount} 只股息率 ≥ 5%`}
           </p>
           <span className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-[var(--lagoon-deep)]">
-            查看能源股
+            查看标的
             <ArrowRight className="size-4 transition group-hover:translate-x-1" />
           </span>
         </Link>
@@ -302,8 +329,8 @@ function DashboardPage() {
             红利 ETF 平均股息率
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            对比十年国债 {BOND_YIELD_10Y}%，股债利差约 +
-            {(avgYield - BOND_YIELD_10Y).toFixed(2)}%
+            对比十年国债 {bondYield.toFixed(2)}%，股债利差约 +
+            {(avgYield - bondYield).toFixed(2)}%
           </p>
         </div>
 
@@ -318,8 +345,8 @@ function DashboardPage() {
             银行平均股息率
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            对比十年国债 {BOND_YIELD_10Y}%，股债利差约 +
-            {(bankAvgYield - BOND_YIELD_10Y).toFixed(2)}%
+            对比十年国债 {bondYield.toFixed(2)}%，股债利差约 +
+            {(bankAvgYield - bondYield).toFixed(2)}%
           </p>
         </div>
 
@@ -331,11 +358,11 @@ function DashboardPage() {
             </span>
           </div>
           <h2 className="mt-4 text-lg font-semibold text-foreground">
-            能源股平均股息率
+            央企平均股息率
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            对比十年国债 {BOND_YIELD_10Y}%，股债利差约 +
-            {(cyclicalAvgYield - BOND_YIELD_10Y).toFixed(2)}%
+            对比十年国债 {bondYield.toFixed(2)}%，股债利差约 +
+            {(cyclicalAvgYield - bondYield).toFixed(2)}%
           </p>
         </div>
       </div>
@@ -489,7 +516,7 @@ function DashboardPage() {
       <div>
         <div className="mb-3 flex items-center justify-between">
           <h2 className="display-title text-xl font-bold text-foreground">
-            能源高股息 · 股息率榜
+            央企高股息 · 股息率榜
           </h2>
           <Link
             to="/cyclicals"
@@ -508,7 +535,10 @@ function DashboardPage() {
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {topCyclicals.map((stock) => {
-              const rating = rateCyclicalYield(stock.dividendYield)
+              const rating = rateCyclicalYield(
+                stock.dividendYield,
+                stock.category,
+              )
               return (
                 <Link
                   key={stock.code}
@@ -572,10 +602,10 @@ function DashboardPage() {
 
       <p className="text-xs text-muted-foreground">
         评级方法：ETF
-        以“股息率 + PB + PE 三因子在各自多年区间中的分位”加权衡量低估程度（权重
-        50/30/20）；银行与能源高股息（煤炭/电力/石油）按“每股分红 ÷
-        实时股价”动态测算股息率。越便宜越低估、越值得关注。
-        本工具仅供学习研究，不构成投资建议。
+        以“股息率 + PB + PE 在各自多年区间中的位置”加权衡量便宜度（默认权重
+        50/30/20，股息率实时时 70/20/10）；银行与央企按“每股分红 ÷
+        实时股价”测算股息率。组合被动收入中 ETF 按指数股息率 ×
+        85% 估算到手。本工具仅供学习研究，不构成投资建议。
       </p>
     </div>
   )

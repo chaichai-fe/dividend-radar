@@ -6,9 +6,10 @@ import { toast } from 'sonner'
 
 import { listBanks } from '#/server/banks'
 import type { BankQuote } from '#/server/banks'
+import { getBondYield10Y } from '#/server/bond-yield'
 import { rateBankYield } from '#/lib/bank-data'
 import type { BankCategory } from '#/lib/bank-data'
-import { equityBondSpread } from '#/lib/rating'
+import { BOND_YIELD_10Y_FALLBACK, equityBondSpread } from '#/lib/rating'
 import { addHolding } from '#/server/portfolio'
 import { Input } from '#/components/ui/input'
 import { Button } from '#/components/ui/button'
@@ -26,10 +27,17 @@ import {
 export const Route = createFileRoute('/banks')({
   component: BanksPage,
   loader: async ({ context }) => {
-    await context.queryClient.ensureQueryData({
-      queryKey: ['banks'],
-      queryFn: () => listBanks(),
-    })
+    const qc = context.queryClient
+    await Promise.all([
+      qc.ensureQueryData({
+        queryKey: ['banks'],
+        queryFn: () => listBanks(),
+      }),
+      qc.ensureQueryData({
+        queryKey: ['bond-yield'],
+        queryFn: () => getBondYield10Y(),
+      }),
+    ])
   },
 })
 
@@ -63,6 +71,11 @@ function BanksPage() {
     queryKey: ['banks'],
     queryFn: () => listBanks(),
   })
+  const bondQuery = useQuery({
+    queryKey: ['bond-yield'],
+    queryFn: () => getBondYield10Y(),
+  })
+  const bondYield = bondQuery.data?.yield ?? BOND_YIELD_10Y_FALLBACK
 
   const [keyword, setKeyword] = useState('')
   const [filter, setFilter] = useState<CategoryFilter>('all')
@@ -75,9 +88,9 @@ function BanksPage() {
     return rows.map((bank) => ({
       bank,
       rating: rateBankYield(bank.dividendYield),
-      spread: equityBondSpread(bank.dividendYield),
+      spread: equityBondSpread(bank.dividendYield, bondYield),
     }))
-  }, [rows])
+  }, [rows, bondYield])
 
   const visible = useMemo(() => {
     const kw = keyword.trim().toLowerCase()
@@ -348,8 +361,11 @@ function BanksPage() {
         股息率按“每股分红 ÷ 实时股价”动态计算，股价越低股息率越高。每股分红采用
         <span className="text-foreground">前瞻口径</span>
         ：取最新已公告年度分红合计（含预案/董事会或股东大会通过），第一时间反映分红上调或下调，
-        故可能高于部分平台采用的“近 12 个月已实施”口径。分红数据来自东方财富，PB
-        为参考值。本工具仅供学习研究，不构成投资建议。
+        故可能高于部分平台采用的“近 12 个月已实施”口径。股债利差对比十年国债
+        {bondQuery.data?.live
+          ? ` ${bondYield.toFixed(2)}%（${bondQuery.data.date || '实时'}）`
+          : ` ${bondYield.toFixed(2)}%（参考值）`}
+        。分红数据来自东方财富，PB 为参考值。本工具仅供学习研究，不构成投资建议。
       </p>
 
       <AddDialog bank={target} onClose={() => setTarget(null)} />

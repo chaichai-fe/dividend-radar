@@ -22,7 +22,7 @@ import {
   removeHolding,
   setHoldingAmount,
 } from '#/server/portfolio'
-import { valuateMulti } from '#/lib/rating'
+import { ETF_INCOME_HAIRCUT, effectiveIncomeYield, valuateMulti } from '#/lib/rating'
 import type { MultiValuation } from '#/lib/rating'
 import { DIVIDENDS, DIVIDEND_DATA_DATE } from '#/lib/dividend-data'
 import { RatingBadge } from '#/components/rating-badge'
@@ -241,11 +241,17 @@ function PortfolioPage() {
         if (!inst) return null
         // h.amount 表示持有份数/股数，市值 = 数量 × 现价
         const marketValue = h.amount * inst.price
-        const annualIncome = marketValue * (inst.dividendYield / 100)
+        // ETF 用指数股息率 × 折扣估算到手；个股用 dps/现价 全额
+        const incomeYield = effectiveIncomeYield(
+          inst.dividendYield,
+          inst.kind,
+        )
+        const annualIncome = marketValue * (incomeYield / 100)
         return {
           holding: h,
           inst,
           marketValue,
+          incomeYield,
           annualIncome,
         }
       })
@@ -254,7 +260,9 @@ function PortfolioPage() {
 
   const totalAmount = rows.reduce((s, r) => s + r.marketValue, 0)
   const totalIncome = rows.reduce((s, r) => s + r.annualIncome, 0)
+  // 加权股息率按「估算到手」口径，与被动收入一致
   const portfolioYield = totalAmount > 0 ? (totalIncome / totalAmount) * 100 : 0
+  const hasEtfHolding = rows.some((r) => r.inst.kind === 'etf')
 
   // 持仓分红日历：只展示当前组合内 ETF 的分红安排
   const today = todayStr()
@@ -413,22 +421,29 @@ function PortfolioPage() {
         />
         <SummaryCard
           icon={PiggyBank}
-          label="组合加权股息率"
+          label="估算加权股息率"
           value={`${portfolioYield.toFixed(2)}%`}
           accent
         />
         <SummaryCard
           icon={PiggyBank}
-          label="预计年被动收入"
+          label="估算年被动收入"
           value={`¥${totalIncome.toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
           accent
         />
         <SummaryCard
           icon={PiggyBank}
-          label="预计月均被动收入"
+          label="估算月均被动收入"
           value={`¥${(totalIncome / 12).toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
         />
       </div>
+      {hasEtfHolding && (
+        <p className="-mt-2 text-xs text-muted-foreground">
+          ETF 被动收入按跟踪指数股息率 × {Math.round(ETF_INCOME_HAIRCUT * 100)}%
+          估算（覆盖管理费、分红政策与现金拖累）；个股按每股分红 ÷
+          现价全额计入。列表中的「股息率」仍为原始展示口径。
+        </p>
+      )}
 
       <div className="island-shell rounded-2xl p-5">
         <label className="text-sm font-medium text-foreground">
@@ -990,7 +1005,7 @@ function KindTag({ kind }: { kind: 'etf' | 'bank' | 'cyclical' }) {
       cls: 'bg-amber-500/15 text-amber-600 dark:text-amber-400',
     },
     cyclical: {
-      label: '能源',
+      label: '央企',
       cls: 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-400',
     },
   } as const

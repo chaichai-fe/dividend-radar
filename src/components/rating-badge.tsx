@@ -32,7 +32,7 @@ export function RatingBadge({
   )
 }
 
-/** 低估程度进度条：越满越便宜。 */
+/** 便宜度进度条：越满越便宜（区间位置，非严格历史百分位）。 */
 export function ValuationBar({ valuation }: { valuation: Valuation }) {
   const barColor: Record<Valuation['tone'], string> = {
     'buy-strong': 'bg-emerald-500',
